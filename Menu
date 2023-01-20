@@ -1,0 +1,550 @@
+/*
+	INTEGRANTES:
+
+    -Ruben Santiago Cruz Peña
+    -Naren Alejandro Imbachi Quinayas
+    -Santiago Nieto Guaca
+*/
+
+//Se incluyen las librerias necesarias
+
+#include <Keypad.h>
+#include <LiquidCrystal.h>
+#include <stdlib.h>
+#include <EEPROM.h>
+#include "AsyncTaskLib.h"
+//#include "DHTStable.h"
+
+//Definicion de los valores de los pines de los colores del LED
+#define LED_BLUE 1
+#define LED_RED 2
+#define LED_GREEN 3
+
+//Definicion del valor del pin del BUZZER
+#define BUZZER_PASIVO 6	// buzzer pasivo en pin 8
+#define DHT11_PIN 6
+
+//definicion de melodias
+#define NOTE_B0  31	// notas y frecuencias
+#define NOTE_C1  33
+#define NOTE_CS1 35
+#define NOTE_D1  37
+#define NOTE_DS1 39
+#define NOTE_E1  41
+#define NOTE_F1  44
+#define NOTE_FS1 46
+#define NOTE_G1  49
+#define NOTE_GS1 52
+#define NOTE_A1  55
+#define NOTE_AS1 58
+#define NOTE_B1  62
+#define NOTE_C2  65
+#define NOTE_CS2 69
+#define NOTE_D2  73
+#define NOTE_DS2 78
+#define NOTE_E2  82
+#define NOTE_F2  87
+#define NOTE_FS2 93
+#define NOTE_G2  98
+#define NOTE_GS2 104
+#define NOTE_A2  110
+#define NOTE_AS2 117
+#define NOTE_B2  123
+#define NOTE_C3  131
+#define NOTE_CS3 139
+#define NOTE_D3  147
+#define NOTE_DS3 156
+#define NOTE_E3  165
+#define NOTE_F3  175
+#define NOTE_FS3 185
+#define NOTE_G3  196
+#define NOTE_GS3 208
+#define NOTE_A3  220
+#define NOTE_AS3 233
+#define NOTE_B3  247
+#define NOTE_C4  262
+#define NOTE_CS4 277
+#define NOTE_D4  294
+#define NOTE_DS4 311
+#define NOTE_E4  330
+#define NOTE_F4  349
+#define NOTE_FS4 370
+#define NOTE_G4  392
+#define NOTE_GS4 415
+#define NOTE_A4  440
+#define NOTE_AS4 466
+#define NOTE_B4  494
+#define NOTE_C5  523
+#define NOTE_CS5 554
+#define NOTE_D5  587
+#define NOTE_DS5 622
+#define NOTE_E5  659
+#define NOTE_F5  698
+#define NOTE_FS5 740
+#define NOTE_G5  784
+#define NOTE_GS5 831
+#define NOTE_A5  880
+#define NOTE_AS5 932
+#define NOTE_B5  988
+#define NOTE_C6  1047
+#define NOTE_CS6 1109
+#define NOTE_D6  1175
+#define NOTE_DS6 1245
+#define NOTE_E6  1319
+#define NOTE_F6  1397
+#define NOTE_FS6 1480
+#define NOTE_G6  1568
+#define NOTE_GS6 1661
+#define NOTE_A6  1760
+#define NOTE_AS6 1865
+#define NOTE_B6  1976
+#define NOTE_C7  2093
+#define NOTE_CS7 2217
+#define NOTE_D7  2349
+#define NOTE_DS7 2489
+#define NOTE_E7  2637
+#define NOTE_F7  2794
+#define NOTE_FS7 2960
+#define NOTE_G7  3136
+#define NOTE_GS7 3322
+#define NOTE_A7  3520
+#define NOTE_AS7 3729
+#define NOTE_B7  3951
+#define NOTE_C8  4186
+#define NOTE_CS8 4435
+#define NOTE_D8  4699
+#define NOTE_DS8 4978
+
+
+//Configuracion del Keyboard
+
+const byte ROWS = 4;  //four rows
+const byte COLS = 4;  //four columns
+
+char keys[ROWS][COLS] = {
+  { '1', '2', '3', 'A'},
+  { '4', '5', '6', 'B' },
+  { '7', '8', '9', 'C'},
+  { '*', '0', '#', 'D' }
+};
+
+byte rowPins[ROWS] = {52, 50, 48, 46}; //connect to the row pinouts of the keypad
+byte colPins[COLS] = {44, 42, 40, 38}; //connect to the column pinouts of the keypad
+
+Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
+
+//Configuracion del LCD
+
+const int rs = 12, en = 11, d4 = 10, d5 = 9, d6 = 8, d7 = 7;
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+
+char seleccion;
+char seleccion1;
+
+int cont = -1;
+int first = 0;
+
+//se definen los valores por defecto de la temperatura
+const int resetUmbralTempHigh = 29;
+const int resetUmbralTempLow = 26;
+//se definen los valores de maxima temperatura y minima de luz
+const int maxtemp = 125;
+const int minluz = 1023;
+
+
+//se definen e inicializan las variables a utilizar
+int umbralTempHigh = 29;
+int umbralTempLow = 26;
+int umbralLuzHigh = 1024;
+int umbralLuzLow = 1023;
+char valor[4];
+int band = 0;
+boolean band1 = true;
+
+float auxUmbralTempHigh;
+float auxUmbralTempLow;
+float auxUmbralLuzHigh;
+float auxUmbralLuzLow;
+//melodias y duraciones buzzer
+int melodia[] = {		// array con las notas de la melodia
+  NOTE_C4, NOTE_C4, NOTE_D4, NOTE_C4, NOTE_F4, NOTE_E4, NOTE_C4, NOTE_C4, NOTE_D4, NOTE_C4, NOTE_G4, NOTE_F4, NOTE_C4, NOTE_C4, NOTE_C5, NOTE_A4, NOTE_F4, NOTE_E4, NOTE_D4, NOTE_AS4, NOTE_AS4, NOTE_A4, NOTE_F4, NOTE_G4, NOTE_F4
+};
+
+int duraciones[] = {		// array con la duracion de cada nota
+  8, 8, 4, 4, 4, 2, 8, 8, 4, 4, 4, 2, 8, 8, 4, 4, 4, 4, 4, 8, 8, 4, 4, 4, 2
+};
+
+//Para usar millis
+unsigned long previousMillis = 0;
+unsigned long currentMillis = 0;
+
+
+void pasarMenus();
+
+//Se definen las tareas
+//AsyncTask esperarEscribir(10000,true,);
+//AsyncTask Tiempo(10000,true,temp);
+
+void setup() {
+
+  band = EEPROM.read(40);
+  pinMode(LED_BLUE, OUTPUT);
+  pinMode(LED_GREEN, OUTPUT);
+  pinMode(LED_RED, OUTPUT);
+
+  digitalWrite(LED_BLUE, LOW);
+  digitalWrite(LED_GREEN, LOW);
+  digitalWrite(LED_RED, LOW);
+  lcd.begin(16, 2); //Inicializamos el display configurando 16 columnas por 2 filas
+
+  if (band == 255) {
+    guardarMemoria();
+  } else {
+    recuperarMemoria();
+  }
+
+  //asyncTask2.Start();
+}
+
+void guardarMemoria() {
+  EEPROM.put(0, umbralTempHigh);
+  EEPROM.put(10, umbralTempLow);
+  EEPROM.put(20, umbralLuzHigh);
+  EEPROM.put(30, umbralLuzLow);
+  EEPROM.put(40, 300);
+}
+
+void recuperarMemoria() {
+  EEPROM.get(0, umbralTempHigh);
+  EEPROM.get(10,  umbralTempLow);
+  EEPROM.get(20, umbralLuzHigh);
+  EEPROM.get(30, umbralLuzLow);
+}
+
+void loop() {
+  pasarMenus();
+  //asyncTask2.Update();
+}
+
+void pasarMenus() {
+  //Se muestra el mensaje inicial
+  if (cont == -1) {
+    lcd.setCursor(0, 0);
+    lcd.println("Presione * para cambiar menu");
+    lcd.setCursor(0, 1);
+    lcd.print("cambiar el menu");
+    cont = 0;
+  }
+
+  //Se va pasando las opciones del menu a medida que se presiona '*'
+  seleccion = keypad.getKey();
+  if (seleccion != NO_KEY && seleccion == '*') {
+    lcd.clear();
+    cont++;
+
+    if (cont == 5) {
+      cont = 1;
+    }
+    switch (cont) {
+      case 1:
+        menu1();
+        break;
+      case 2:
+        menu2();
+        break;
+      case 3:
+        menu3();
+        break;
+      case 4:
+        menu4();
+        break;
+    }
+  }
+
+  if ((seleccion == '1' || seleccion == '2' || seleccion == '3' || seleccion == '4' || seleccion == '5') && cont != 0) {
+    switch (seleccion) {
+      case '1':
+        if (cont == 1) {
+          lcd.clear();
+          pedirValor(umbralTempHigh);
+          if (band1) {
+            verificarTemperaturaAlta();
+          } else {
+            cont = 0;
+          }
+
+        }
+        break;
+      case '2':
+        if (cont == 1 || cont == 2) {
+          lcd.clear();
+          pedirValor(umbralTempLow);
+          if (band1) {
+            verificarTemperaturaBaja();
+          } else {
+            cont = 0;
+          }
+
+        }
+        break;
+      case '3':
+        if (cont == 2 || cont == 3) {
+          lcd.clear();
+          pedirValor(umbralLuzHigh);
+          if (band1) {
+            verificarLuzAlta();
+          } else {
+            cont = 0;
+          }
+
+        }
+        break;
+      case '4':
+        if (cont == 3 || cont == 4) {
+          lcd.clear();
+          pedirValor(umbralLuzLow);
+          if (band1) {
+            verificarLuzBaja();
+          } else {
+            cont = 0;
+          }
+
+        }
+        break;
+      case '5':
+        if (cont == 4) {
+          umbralTempHigh = resetUmbralTempHigh;
+          umbralTempLow = resetUmbralTempLow;
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print("Reset exitoso");
+          delay(3000);
+          mensajeEspera();
+          cont = 0;
+        }
+        break;
+    }
+
+  }
+}
+
+void menu1() {
+  lcd.setCursor(0, 0);
+  lcd.print("1. UmbralTemp  High");
+  lcd.setCursor(0, 1);
+  lcd.println("2. UmbralTemp  Low");
+}
+
+void menu2() {
+  lcd.setCursor(0, 0);
+  lcd.print("2. UmbralTemp  Low");
+  lcd.setCursor(0, 1);
+  lcd.println("3. Umbral Luz High");
+}
+
+void menu3() {
+  lcd.setCursor(0, 0);
+  lcd.print("3. Umbral Luz High");
+  lcd.setCursor(0, 1);
+  lcd.println("4. Umbral Luz Low");
+}
+
+void menu4() {
+  lcd.setCursor(0, 0);
+  lcd.print("4. Umbral Luz Low");
+  lcd.setCursor(0, 1);
+  lcd.println("5. Reset");
+}
+
+
+void pedirValor(int valorAnt) {
+  boolean band2 = true;
+  //int tiempo = 4000;
+
+  for (int i = 0; i < 4; i++) {
+    valor[i] = ' ';
+  }
+  mensajeValorActual(valorAnt) ;
+  lcd.setCursor(0, 1);
+  lcd.print("Nuevo Valor:");
+  int cont1 = 0;
+  previousMillis = millis();
+  currentMillis = millis();
+  do {
+    band2 = true;
+    while ((currentMillis - previousMillis) <= (10000)  && band2) {
+      currentMillis = millis();
+      seleccion = keypad.getKey();
+      if (seleccion != NO_KEY ) {
+          band2 = false;
+      }
+    }
+    if(band2){
+      seleccion = 'B';
+    }
+    if (seleccion != NO_KEY && seleccion != '*'  && seleccion != 'A'  && seleccion != 'D'   && seleccion != 'B' && seleccion != 'C' && seleccion != '#') {
+      valor[cont1] = seleccion;
+      lcd.setCursor(cont1 + 12, 1);
+      lcd.print(seleccion);
+      cont1++;
+      band1 = true;
+    }
+  } while ((seleccion != '#' && cont1 < 4) && seleccion != 'B');
+
+  if (seleccion == 'B') {
+    //cont = 0;
+    band1 = false;
+    mensajeEspera();
+
+  }
+}
+
+void seleccionar() {
+}
+
+void mensajeEspera() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.println("Presione * para");
+  lcd.setCursor(0, 1);
+  lcd.print("continuar");
+};
+
+void mensajeExito() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Ajuste con exito");
+  delay(3000);
+  mensajeEspera();
+}
+
+void mensajeFueraRango() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.println("Error. Valor");
+  lcd.setCursor(0, 1);
+  lcd.print("Fuera de rango");
+  delay(3000);
+  mensajeEspera();
+  cont = 0;
+}
+
+void verificarTemperaturaBaja() {
+  if ( umbralTempHigh < atoi(valor)) {
+    mensajeFueraRango();
+  }
+  else {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Ajuste con exito");
+    verificacionTemp();
+    umbralTempLow = atoi(valor);
+    EEPROM.put(10, umbralTempLow);
+    cont = 0;
+    mensajeEspera();
+  }
+}
+
+void verificarTemperaturaAlta() {
+  if ( umbralTempLow > atoi(valor)) {
+    mensajeFueraRango();
+  } else if ( atoi(valor) > maxtemp ) {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.println("Error. Max de temp");
+    lcd.setCursor(0, 1);
+    lcd.print("sobrepasado");
+    delay(3000);
+    mensajeEspera();
+    cont = 0;
+
+  } else {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Ajuste con exito");
+    verificacionTemp();
+    umbralTempHigh = atoi(valor);
+    EEPROM.put(0, umbralTempHigh);
+    cont = 0;
+    mensajeEspera();
+  }
+}
+
+void verificarLuzAlta() {
+  int valor2 = (int)(atoi(valor)) / 10;
+  if ( umbralLuzLow > valor2) {
+    mensajeFueraRango();
+  } else {
+    umbralLuzHigh = valor2;
+    EEPROM.put(20, umbralLuzHigh);
+    mensajeExito();
+    cont = 0;
+  }
+}
+
+void verificarLuzBaja() {
+  int valor2 = (int)(atoi(valor)) / 10;
+  if ( umbralLuzHigh < valor2) {
+    mensajeFueraRango();
+  } else if ( valor2 < minluz ) {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.println("Error. Min de temp");
+    lcd.setCursor(0, 1);
+    lcd.print("sobrepasado");
+    delay(3000);
+    mensajeEspera();
+    cont = 0;
+
+  } else {
+    umbralLuzLow = valor2;
+    EEPROM.put(30, valor2);
+    mensajeExito();
+    cont = 0;
+  }
+}
+
+
+void verificacionTemp() {
+  int valor1 = atoi(valor) ;
+  if ( valor1 > umbralTempHigh) {
+    digitalWrite(LED_BLUE, LOW);
+    digitalWrite(LED_GREEN, LOW);
+    digitalWrite(LED_RED, HIGH);
+    sonidoBuzzer();
+  } else if (  valor1 < umbralTempLow ) {
+    digitalWrite(LED_GREEN, LOW);
+    digitalWrite(LED_RED, LOW);
+    digitalWrite(LED_BLUE, HIGH);
+    delay(3000);
+
+  } else {
+    digitalWrite(LED_RED, LOW);
+    digitalWrite(LED_BLUE, LOW);
+    digitalWrite(LED_GREEN, HIGH);
+    delay(3000);
+  }
+  digitalWrite(LED_RED, LOW);
+  digitalWrite(LED_BLUE, LOW);
+  digitalWrite(LED_GREEN, LOW);
+}
+
+void sonidoBuzzer() {
+  for (int i = 0; i < 10; i++) {			// bucle repite 10 veces
+    int duracion = 1000 / duraciones[i];		// duracion de la nota en milisegundos
+    tone(BUZZER_PASIVO, melodia[i], duracion);	// ejecuta el tono con la duracion
+    int pausa = duracion * 1.30;			// calcula pausa
+    delay(pausa);					// demora con valor de pausa
+    noTone(BUZZER_PASIVO);				// detiene reproduccion de tono
+  }
+}
+
+void mensajeValorActual(int valorAnt) {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Valor ant: ");
+  lcd.print(valorAnt);
+}
+
+
+
